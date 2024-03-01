@@ -30,25 +30,61 @@ void q_free(struct list_head *head)
         return;
     }
 
-    struct list_head *current = head->next;
-    while (current != head) {
-        struct list_head *tmp = current;
-        current = current->next;
-        free(tmp);
-    }
+    element_t *n, *s;
+    list_for_each_entry_safe (n, s, head, list)
+        q_release_element(n);
 
+    // struct list_head *current = head->next;
+    // while (current != head) {
+    //     struct list_head *tmp = current;
+    //     current = current->next;
+
+    //     list_del(tmp);
+    //     free(tmp);
+    // }
     free(head);
 }
 
 /* Insert an element at head of queue */
 bool q_insert_head(struct list_head *head, char *s)
 {
+    if (!head) {
+        return false;
+    }
+
+    element_t *new_element = malloc(sizeof(element_t));
+    if (!new_element) {
+        return false;
+    }
+    new_element->value = strdup(s);  // strdup 自動分配內存 複製字符串
+    if (!new_element->value) {       //字串複製失敗
+        free(new_element);
+        return false;
+    }
+
+    list_add(&new_element->list, head);
+
     return true;
 }
 
 /* Insert an element at tail of queue */
 bool q_insert_tail(struct list_head *head, char *s)
 {
+    if (!head) {
+        return false;
+    }
+
+    element_t *new_element = malloc(sizeof(element_t));
+    if (!new_element) {
+        return false;
+    }
+    new_element->value = strdup(s);  // strdup 自動分配內存 複製字符串
+    if (!new_element->value) {       //字串複製失敗
+        free(new_element);
+        return false;
+    }
+
+    list_add_tail(&new_element->list, head);
     return true;
 }
 
