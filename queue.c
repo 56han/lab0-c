@@ -34,21 +34,13 @@ void q_free(struct list_head *head)
     list_for_each_entry_safe (n, s, head, list)
         q_release_element(n);
 
-    // struct list_head *current = head->next;
-    // while (current != head) {
-    //     struct list_head *tmp = current;
-    //     current = current->next;
-
-    //     list_del(tmp);
-    //     free(tmp);
-    // }
     free(head);
 }
 
 /* Insert an element at head of queue */
 bool q_insert_head(struct list_head *head, char *s)
 {
-    if (head == NULL) {
+    if (!head) {
         return false;
     }
 
@@ -56,11 +48,16 @@ bool q_insert_head(struct list_head *head, char *s)
     if (!new_element) {
         return false;
     }
-    new_element->value = strdup(s);  // strdup 自動分配內存 複製字符串
-    if (!new_element->value) {       //字串複製失敗
+    // new_element->value = strdup(s);  // strdup 自動分配內存 複製字符串
+
+    new_element->value = malloc(strlen(s) + 1);
+    if (!new_element->value) {
         free(new_element);
         return false;
     }
+
+    strncpy(new_element->value, s, strlen(s));
+    new_element->value[strlen(s)] = '\0';  // 确保字符串终止
 
     list_add(&new_element->list, head);
 
@@ -70,7 +67,7 @@ bool q_insert_head(struct list_head *head, char *s)
 /* Insert an element at tail of queue */
 bool q_insert_tail(struct list_head *head, char *s)
 {
-    if (head == NULL) {
+    if (!head) {
         return false;
     }
 
@@ -92,10 +89,10 @@ bool q_insert_tail(struct list_head *head, char *s)
 /* Remove an element from head of queue */
 element_t *q_remove_head(struct list_head *head, char *sp, size_t bufsize)
 {
-    if (head == NULL || list_empty(head)) {  // head是否為NULL 或 list是否為空
+    if (!head || list_empty(head)) {  // head是否為NULL 或 list是否為空
         return NULL;
     }
-    element_t *n = container_of(head->next, element_t, list);
+    element_t *n = list_first_entry(head, element_t, list);
     list_del(head->next);
 
     if (sp != NULL) {
@@ -108,10 +105,10 @@ element_t *q_remove_head(struct list_head *head, char *sp, size_t bufsize)
 /* Remove an element from tail of queue */
 element_t *q_remove_tail(struct list_head *head, char *sp, size_t bufsize)
 {
-    if (head == NULL || list_empty(head)) {
+    if (!head || list_empty(head)) {
         return NULL;
     }
-    element_t *n = container_of(head->prev, element_t, list);
+    element_t *n = list_last_entry(head, element_t, list);
     list_del(head->prev);
 
     if (sp != NULL) {
@@ -139,6 +136,16 @@ int q_size(struct list_head *head)
 bool q_delete_mid(struct list_head *head)
 {
     // https://leetcode.com/problems/delete-the-middle-node-of-a-linked-list/
+    if (!head || list_empty(head))
+        return false;
+    struct list_head *slow = head->next;
+
+    for (struct list_head *fast = head->next;
+         fast != head && fast->next != head; fast = fast->next->next) {
+        slow = slow->next;
+    }
+    list_del(slow);
+    q_release_element(list_entry(slow, element_t, list));
 
     return true;
 }
@@ -147,6 +154,39 @@ bool q_delete_mid(struct list_head *head)
 bool q_delete_dup(struct list_head *head)
 {
     // https://leetcode.com/problems/remove-duplicates-from-sorted-list-ii/
+    if (!head || head->next == head)
+        return false;
+    struct list_head *node;
+    bool flag = false;
+
+    for (node = head->next; node->next != head;) {
+        element_t *current = list_entry(node, element_t, list);
+        element_t *next = list_entry(node->next, element_t, list);
+
+        if (strcmp(current->value, next->value) == 0) {
+            list_del(&next->list);
+            q_release_element(next);
+            flag = true;
+        } else {
+            if (flag) {
+                // 刪除當前節點
+                struct list_head *temp = node->next;  // 保存下一個節點的地址
+                list_del(node);
+                q_release_element(current);
+                node = temp;  // 更新node為下一個節點
+                flag = false;
+            } else {
+                node = node->next;
+            }
+            // flag = false;
+        }
+    }
+    // 處理最後有重複的節點
+    if (flag) {
+        element_t *c = list_entry(node, element_t, list);
+        list_del(node);
+        q_release_element(c);
+    }
     return true;
 }
 
@@ -154,34 +194,143 @@ bool q_delete_dup(struct list_head *head)
 void q_swap(struct list_head *head)
 {
     // https://leetcode.com/problems/swap-nodes-in-pairs/
+    if (!head)
+        return;
+    struct list_head *node;
+
+    for (node = head->next; (node->next != head) && (node != head);
+         node = node->next) {
+        struct list_head *next = node->next;
+        list_del(node);
+        list_add(node, next);
+    }
 }
 
 /* Reverse elements in queue */
-void q_reverse(struct list_head *head) {}
+void q_reverse(struct list_head *head)
+{
+    if (!head)
+        return;
+
+    struct list_head *current, *s;
+    list_for_each_safe (current, s, head)
+        list_move(current, head);
+}
 
 /* Reverse the nodes of the list k at a time */
 void q_reverseK(struct list_head *head, int k)
 {
     // https://leetcode.com/problems/reverse-nodes-in-k-group/
+    if (!head || list_empty(head))
+        return;
+
+    struct list_head *it, *safe, *cut;
+    int count = k;
+    cut = head;
+    list_for_each_safe (it, safe, head) {
+        if (--count)
+            continue;
+        LIST_HEAD(tmp);
+        count = k;
+        list_cut_position(&tmp, cut, it);
+        q_reverse(&tmp);
+        list_splice(&tmp, cut);
+        cut = safe->prev;
+    }
 }
 
 /* Sort elements of queue in ascending/descending order */
-void q_sort(struct list_head *head, bool descend) {}
+void q_sort(struct list_head *head, bool descend)
+{
+    // if (!head)
+    //     return;
+
+    // if (descend == false) {  // ascend
+
+    // } else {
+    // }
+}
 
 /* Remove every node which has a node with a strictly less value anywhere to
  * the right side of it */
 int q_ascend(struct list_head *head)
 {
     // https://leetcode.com/problems/remove-nodes-from-linked-list/
-    return 0;
+    if (!head || list_empty(head))
+        return 0;
+
+    struct list_head *cur = head->next;
+    while (cur != head) {  // 外层循环遍历链表
+        struct list_head *next_for_comparison = cur->next;
+        bool should_delete = false;
+
+        while (next_for_comparison !=
+               head) {  // 内层循环遍历当前节点右侧的所有节点
+            element_t *cur_element = list_entry(cur, element_t, list);
+            element_t *next_element =
+                list_entry(next_for_comparison, element_t, list);
+
+            if (strcmp(cur_element->value, next_element->value) > 0) {
+                should_delete = true;
+                break;  // 找到一个严格更小的值，当前节点需要被删除
+            }
+
+            next_for_comparison = next_for_comparison->next;
+        }
+
+        struct list_head *next = cur->next;  // 保存当前节点的下一个节点
+        if (should_delete) {
+            list_del(cur);  // 从链表中删除当前节点
+            element_t *to_delete = list_entry(cur, element_t, list);
+            q_release_element(to_delete);  // 释放节点资源
+        }
+
+        cur = next;  // 移动到下一个节点
+    }
+
+    return q_size(head);
 }
+
+
 
 /* Remove every node which has a node with a strictly greater value anywhere to
  * the right side of it */
 int q_descend(struct list_head *head)
 {
     // https://leetcode.com/problems/remove-nodes-from-linked-list/
-    return 0;
+    if (!head || list_empty(head))
+        return 0;
+
+    struct list_head *cur = head->next;
+    while (cur != head) {  // 外层循环遍历链表
+        struct list_head *next_for_comparison = cur->next;
+        bool should_delete = false;
+
+        while (next_for_comparison !=
+               head) {  // 内层循环遍历当前节点右侧的所有节点
+            element_t *cur_element = list_entry(cur, element_t, list);
+            element_t *next_element =
+                list_entry(next_for_comparison, element_t, list);
+
+            if (strcmp(cur_element->value, next_element->value) < 0) {
+                should_delete = true;
+                break;  // 找到一个严格更小的值，当前节点需要被删除
+            }
+
+            next_for_comparison = next_for_comparison->next;
+        }
+
+        struct list_head *next = cur->next;  // 保存当前节点的下一个节点
+        if (should_delete) {
+            list_del(cur);  // 从链表中删除当前节点
+            element_t *to_delete = list_entry(cur, element_t, list);
+            q_release_element(to_delete);  // 释放节点资源
+        }
+
+        cur = next;  // 移动到下一个节点
+    }
+
+    return q_size(head);
 }
 
 /* Merge all the queues into one sorted queue, which is in ascending/descending
