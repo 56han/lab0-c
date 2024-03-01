@@ -239,16 +239,58 @@ void q_reverseK(struct list_head *head, int k)
     }
 }
 
+static int q_merge_two(struct list_head *first, struct list_head *second)
+{
+    if (!first || !second)
+        return 0;
+
+    int count = 0;
+    LIST_HEAD(tmp);
+    while (!list_empty(first) && !list_empty(second)) {
+        element_t *f = list_first_entry(first, element_t, list);
+        element_t *s = list_first_entry(second, element_t, list);
+        if (strcmp(f->value, s->value) <= 0)
+            list_move_tail(&f->list, &tmp);
+        else
+            list_move_tail(&s->list, &tmp);
+        count++;
+    }
+    count += q_size(first) + q_size(second);
+    list_splice(&tmp, first);
+    list_splice_tail_init(second, first);
+
+    return count;
+}
+
 /* Sort elements of queue in ascending/descending order */
 void q_sort(struct list_head *head, bool descend)
 {
-    // if (!head)
-    //     return;
+    /* Try to use merge sort*/
+    if (!head || list_empty(head) || list_is_singular(head))
+        return;
 
-    // if (descend == false) {  // ascend
+    /* Find middle point */
+    struct list_head *mid, *left, *right;
+    left = right = head;
+    do {
+        left = left->next;
+        right = right->prev;
+    } while (left != right && left->next != right);
+    mid = left;
 
-    // } else {
-    // }
+    /* Divide into two part */
+    LIST_HEAD(second);
+    list_cut_position(&second, mid, head->prev);
+
+    /* Conquer */
+    q_sort(head, false);
+    q_sort(&second, false);
+
+    /* Merge */
+    q_merge_two(head, &second);
+    if (descend == true) {
+        q_reverse(head);
+    }
 }
 
 /* Remove every node which has a node with a strictly less value anywhere to
@@ -333,10 +375,61 @@ int q_descend(struct list_head *head)
     return q_size(head);
 }
 
+
+
 /* Merge all the queues into one sorted queue, which is in ascending/descending
  * order */
 int q_merge(struct list_head *head, bool descend)
 {
     // https://leetcode.com/problems/merge-k-sorted-lists/
-    return 0;
+    if (!head || list_empty(head))
+        return 0;
+
+    if (list_is_singular(head))
+        return list_first_entry(head, queue_contex_t, chain)->size;
+
+    /* Use 2-merge algorithm in https://arxiv.org/pdf/1801.04641.pdf */
+    LIST_HEAD(pending);
+    LIST_HEAD(empty);
+    int n = 0;
+    while (!list_empty(head)) {
+        list_move(head->next, &pending);
+        n++;
+
+        while (n > 3) {
+            queue_contex_t *x, *y, *z;
+            x = list_first_entry(&pending, queue_contex_t, chain);
+            y = list_first_entry(&x->chain, queue_contex_t, chain);
+            z = list_first_entry(&x->chain, queue_contex_t, chain);
+
+            if (y->size >= z->size << 1)
+                break;
+
+            if (x->size < z->size) {
+                y->size = q_merge_two(y->q, x->q);
+                list_move(&x->chain, &empty);
+                n--;
+            } else {
+                z->size = q_merge_two(z->q, y->q);
+                list_move(&y->chain, &empty);
+                n--;
+            }
+        }
+    }
+
+    /* Merge remaining list */
+    while (n > 1) {
+        queue_contex_t *x, *y;
+        x = list_first_entry(&pending, queue_contex_t, chain);
+        y = list_first_entry(&x->chain, queue_contex_t, chain);
+        y->size = q_merge_two(y->q, x->q);
+        list_move(&x->chain, &empty);
+        n--;
+    }
+
+    /* Move the last queue and empty queue to head */
+    list_splice(&empty, head);
+    list_splice(&pending, head);
+
+    return list_first_entry(head, queue_contex_t, chain)->size;
 }
