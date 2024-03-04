@@ -250,7 +250,7 @@ static int q_merge_two(struct list_head *first, struct list_head *second)
         element_t *f = list_first_entry(first, element_t, list);
         element_t *s = list_first_entry(second, element_t, list);
         if (strcmp(f->value, s->value) <= 0)
-            list_move_tail(&f->list, &tmp);
+            list_move_tail(&f->list, &tmp);  // f 接到 tmp 後面
         else
             list_move_tail(&s->list, &tmp);
         count++;
@@ -302,32 +302,32 @@ int q_ascend(struct list_head *head)
         return 0;
 
     struct list_head *cur = head->next;
-    while (cur != head) {  // 外层循环遍历链表
+    while (cur != head) {  // 外層循環逐一走訪整個 linked list
         struct list_head *next_for_comparison = cur->next;
         bool should_delete = false;
 
         while (next_for_comparison !=
-               head) {  // 内层循环遍历当前节点右侧的所有节点
+               head) {  // 外層循環逐一走訪當前節點右側的所有節點
             element_t *cur_element = list_entry(cur, element_t, list);
             element_t *next_element =
                 list_entry(next_for_comparison, element_t, list);
 
             if (strcmp(cur_element->value, next_element->value) > 0) {
                 should_delete = true;
-                break;  // 找到一个严格更小的值，当前节点需要被删除
+                break;  // 找到一個嚴格更大的值，當前節點需要被刪除
             }
 
             next_for_comparison = next_for_comparison->next;
         }
 
-        struct list_head *next = cur->next;  // 保存当前节点的下一个节点
+        struct list_head *next = cur->next;  // 保存當前節點的下一個節點
         if (should_delete) {
-            list_del(cur);  // 从链表中删除当前节点
+            list_del(cur);  // 從 linked list 中刪除當前節點
             element_t *to_delete = list_entry(cur, element_t, list);
-            q_release_element(to_delete);  // 释放节点资源
+            q_release_element(to_delete);  // 釋放節點資源
         }
 
-        cur = next;  // 移动到下一个节点
+        cur = next;  // 移動到下一個節點
     }
 
     return q_size(head);
@@ -344,32 +344,32 @@ int q_descend(struct list_head *head)
         return 0;
 
     struct list_head *cur = head->next;
-    while (cur != head) {  // 外层循环遍历链表
+    while (cur != head) {  // 外層循環逐一走訪整個 linked list
         struct list_head *next_for_comparison = cur->next;
         bool should_delete = false;
 
         while (next_for_comparison !=
-               head) {  // 内层循环遍历当前节点右侧的所有节点
+               head) {  // 外層循環逐一走訪當前節點右側的所有節點
             element_t *cur_element = list_entry(cur, element_t, list);
             element_t *next_element =
                 list_entry(next_for_comparison, element_t, list);
 
             if (strcmp(cur_element->value, next_element->value) < 0) {
                 should_delete = true;
-                break;  // 找到一个严格更小的值，当前节点需要被删除
+                break;  // 找到一個嚴格更小的值，當前節點需要被刪除
             }
 
             next_for_comparison = next_for_comparison->next;
         }
 
-        struct list_head *next = cur->next;  // 保存当前节点的下一个节点
+        struct list_head *next = cur->next;  // 保存當前節點的下一個節點
         if (should_delete) {
-            list_del(cur);  // 从链表中删除当前节点
+            list_del(cur);  // 從 linked list 中刪除當前節點
             element_t *to_delete = list_entry(cur, element_t, list);
-            q_release_element(to_delete);  // 释放节点资源
+            q_release_element(to_delete);  // 釋放節點資源
         }
 
-        cur = next;  // 移动到下一个节点
+        cur = next;  // 移動到下一個節點
     }
 
     return q_size(head);
@@ -388,48 +388,17 @@ int q_merge(struct list_head *head, bool descend)
     if (list_is_singular(head))
         return list_first_entry(head, queue_contex_t, chain)->size;
 
-    /* Use 2-merge algorithm in https://arxiv.org/pdf/1801.04641.pdf */
-    LIST_HEAD(pending);
-    LIST_HEAD(empty);
-    int n = 0;
-    while (!list_empty(head)) {
-        list_move(head->next, &pending);
-        n++;
+    LIST_HEAD(tmp);
+    queue_contex_t *cur, *safe;
+    queue_contex_t *first = list_first_entry(head, queue_contex_t, chain);
 
-        while (n > 3) {
-            queue_contex_t *x, *y, *z;
-            x = list_first_entry(&pending, queue_contex_t, chain);
-            y = list_first_entry(&x->chain, queue_contex_t, chain);
-            z = list_first_entry(&x->chain, queue_contex_t, chain);
-
-            if (y->size >= z->size << 1)
-                break;
-
-            if (x->size < z->size) {
-                y->size = q_merge_two(y->q, x->q);
-                list_move(&x->chain, &empty);
-                n--;
-            } else {
-                z->size = q_merge_two(z->q, y->q);
-                list_move(&y->chain, &empty);
-                n--;
-            }
-        }
+    list_for_each_entry_safe (cur, safe, head, chain) {
+        list_splice_init(cur->q, &tmp);
     }
 
-    /* Merge remaining list */
-    while (n > 1) {
-        queue_contex_t *x, *y;
-        x = list_first_entry(&pending, queue_contex_t, chain);
-        y = list_first_entry(&x->chain, queue_contex_t, chain);
-        y->size = q_merge_two(y->q, x->q);
-        list_move(&x->chain, &empty);
-        n--;
-    }
+    int size = q_size(&tmp);
+    list_splice_init(&tmp, first->q);
+    q_sort(first->q, descend);
 
-    /* Move the last queue and empty queue to head */
-    list_splice(&empty, head);
-    list_splice(&pending, head);
-
-    return list_first_entry(head, queue_contex_t, chain)->size;
+    return size;
 }
