@@ -40,43 +40,33 @@ void q_free(struct list_head *head)
 /* Insert an element at head of queue */
 bool q_insert_head(struct list_head *head, char *s)
 {
-    if (!head) {
-        return false;
-    }
-
     element_t *new_element = malloc(sizeof(element_t));
-    if (!new_element) {
+    if (!head || !new_element) {
         return false;
     }
-    // new_element->value = strdup(s);  // strdup 自動分配內存 複製字符串
 
-    new_element->value = malloc(strlen(s) + 1);
+    // new_element->value = malloc(strlen(s) + 1);
+    new_element->value = strdup(s);
     if (!new_element->value) {
         free(new_element);
         return false;
     }
 
-    strncpy(new_element->value, s, strlen(s));
-    new_element->value[strlen(s)] = '\0';  // 确保字符串终止
-
+    // strncpy(new_element->value, s, (strlen(s)+1));
+    // new_element->value[strlen(s)] = '\0';  // 确保字符串终止
     list_add(&new_element->list, head);
-
     return true;
 }
 
 /* Insert an element at tail of queue */
 bool q_insert_tail(struct list_head *head, char *s)
 {
-    if (!head) {
+    element_t *new_element = malloc(sizeof(element_t));
+    if (!head || !new_element) {
         return false;
     }
 
-    element_t *new_element = malloc(sizeof(element_t));
-    if (!new_element) {
-        return false;
-    }
-    new_element->value =
-        strdup(s);  // strdup 複製字符串，生命週期會和new_element相同
+    new_element->value = strdup(s);
     if (!new_element->value) {  //字串複製失敗
         free(new_element);
         return false;
@@ -402,4 +392,3 @@ int q_merge(struct list_head *head, bool descend)
 
     return size;
 }
-
