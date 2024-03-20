@@ -90,12 +90,10 @@ static void prepare_percentiles(int64_t *exec_times, int64_t *percentiles)
     }
 }
 
-// static void update_statistics(const int64_t *exec_times, uint8_t *classes)
 static void update_statistics(const int64_t *exec_times,
                               int64_t *percentiles,
                               uint8_t *classes)
 {
-    // for (size_t i = 0; i < N_MEASURES; i++) {
     for (size_t i = 10; i < N_MEASURES; i++) {
         int64_t difference = exec_times[i];
         /* CPU cycle counter overflowed or dropped measurement */
@@ -108,8 +106,6 @@ static void update_statistics(const int64_t *exec_times,
                 t_push(t, difference, classes[i]);
             }
         }
-        /* do a t-test on the execution time */
-        // t_push(t, difference, classes[i]);
     }
 }
 
@@ -170,7 +166,6 @@ static bool doit(int mode)
 
     bool ret = measure(before_ticks, after_ticks, input_data, mode);
     differentiate(exec_times, before_ticks, after_ticks);
-    // update_statistics(exec_times, classes);
     prepare_percentiles(exec_times, percentiles);
     update_statistics(exec_times, percentiles, classes);
     ret &= report();
@@ -209,8 +204,6 @@ static bool test_const(char *text, int mode)
     return result;
 }
 
-// #define DUT_FUNC_IMPL(op)
-//     bool is_##op##_const(void) { return test_const(#op, DUT(op)); }
 
 #define DUT_FUNC_IMPL(op)                \
     bool is_##op##_const(void)           \
