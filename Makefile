@@ -43,6 +43,7 @@ OBJS := qtest.o report.o console.o harness.o queue.o \
         linenoise.o web.o \
 		shuffle.o  \
 		list_sort.o  \
+		timsort.o  \
 		game.o
 
 deps := $(OBJS:%.o=.%.o.d)
